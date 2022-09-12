@@ -1,8 +1,14 @@
-from flask import Flask, request, redirect, url_for, flash, send_file
-from werkzeug.utils import secure_filename
-import os
-import sqlite3
-from io import BytesIO
+try: 
+    from flask import Flask, request, redirect, url_for, flash, send_file #, render_template 
+    # from flask_wtf.file import FileField
+    # from wtforms import SubmitField
+    # from flask_wtf import Form
+    from werkzeug.utils import secure_filename
+    import os
+    import sqlite3
+    from io import BytesIO
+except: 
+    print("Some modules missing!" )
 
 #msg="Hello World"
 #print(msg)
@@ -12,11 +18,16 @@ UPLOAD_FOLDER = './certs'
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config["SECRET_KEY"]="secret"
+#app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 # @app.route("/")
 # def hello_world():
-#     return ("<p>Hello Pexonian, trage hier deine Zertifizierungen ein! <br> Hello Pexonian, Please enter your certifications here! </p>") 
-    
+#      return ("<p>Hello Pexonian, trage hier deine Zertifizierungen ein! <br> Hello Pexonian, Please enter your certifications here! </p>") 
+
+# @app.route('/', methods=['GET', 'POST'])
+# def index():
+#     return render_template("home.html")    
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -25,6 +36,7 @@ def allowed_file(filename):
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
+    # Upload new certification
     if request.method == 'POST':
         # check if the post request has the file part
         if 'file' not in request.files:
@@ -40,19 +52,30 @@ def upload_file():
             filename = secure_filename(file.filename)
             # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             insertBLOB(request.form.get('name'),request.form.get('certname'),file.filename, file)
-            print("File saved!")
+            print("** File saved ** :  " + filename )
             return redirect(url_for('upload_file', name=filename))
+    # List existing certifications
     else:
         conn = sqlite3.connect('SQLite_Python.db')
         cur = conn.cursor()
-        cur.execute("SELECT * FROM certs")
-
-        rows = cur.fetchall()
         tablerows = ""
-        for row in rows:
-            tablerows += "<tr><td>" + str(row[0]) + "</td><td>" + row[1] + "</td><td><a href=/cert/" + str(row[0]) + ">" + row[4] + "</a></td></tr>"
+        try:
+            cur.execute("SELECT * FROM certs")
 
-    
+            rows = cur.fetchall()
+            for row in rows:
+                tablerows += "<tr><td>" + str(row[0]) + "</td><td>" + row[1] + "</td><td><a href=/cert/" + str(row[0]) + ">" + row[4] + "</a></td></tr>"
+        except:
+            cur.execute('''CREATE TABLE certs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                            name TEXT NOT NULL, 
+                            cert BLOB NOT NULL, 
+                            filename TEXT NOT NULL, 
+                            certname TEXT NOT NULL);''')
+            conn.commit()
+
+        cur.close()
+        
         return '''
             <!doctype html> 
             <div class="bd-example" align="middle">
@@ -61,13 +84,14 @@ def upload_file():
             <title>Upload new File</title>
             <h1>Upload new File</h1>
 
-            <p>Hello Pexonian, trage hier deine Zertifizierungen ein! <br> Hello Pexonian, Please enter your certifications here! </p>
+            <p>Hello Pexonian, trage hier deine Zertifizierungen ein! <br> Hello Pexonian, please enter your certifications here! </p>
             <form method=post enctype=multipart/form-data>
                 <input type=text name=name placeholder="Emp. Full name"></br></br>
                 <input type=text name=certname placeholder="Emp. Cert name"></br></br>
                 <input type=file name=file>
                 <input type=submit value=Upload>
                 <button type="submit" class="btn btn-primary">Upload certificate</button>
+                
             </form>
             <table>
                 <tr>
@@ -77,7 +101,8 @@ def upload_file():
                 </tr>'''+ tablerows + '''
             </table>
             '''
-
+        
+            
 
 #render("./templates/upload.html")
 
@@ -97,7 +122,7 @@ def downloadCERT(id):
     return send_file(BytesIO(row[2]), download_name=row[3], as_attachment=True)
 
 
-def insertBLOB(name,certname, filename, file):
+def insertBLOB(name, certname, filename, file):
     try:
         sqliteConnection = sqlite3.connect('SQLite_Python.db')
         cursor = sqliteConnection.cursor()
@@ -119,3 +144,8 @@ def insertBLOB(name,certname, filename, file):
         if sqliteConnection:
             sqliteConnection.close()
             print("the sqlite connection is closed")
+
+if __name__ == '__main__':
+    #define the localhost ip and the port that is going to be used
+    # in some future article, we are going to use an env variable instead a hardcoded port 
+    app.run(host='0.0.0.0', port=os.getenv('PORT'))
