@@ -3,4 +3,4 @@ WORKDIR /app
 COPY ./ /app
 RUN pip install flask
 RUN pip install pysqlite3
-CMD ["python", "Cloud_Helloflask.py"]
+CMD ["python", "main.py"]
